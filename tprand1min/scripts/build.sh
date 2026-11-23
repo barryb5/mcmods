@@ -11,6 +11,11 @@ if ! JAVA_HOME="$(/usr/libexec/java_home -v 25 2>/dev/null)"; then
 fi
 export JAVA_HOME
 
+# Republish the shared library first so this build picks up its latest changes.
+if [[ -x ../mcutils/scripts/publish.sh ]]; then
+	../mcutils/scripts/publish.sh -q
+fi
+
 ./gradlew build "$@"
 
 # Print the path of the built mod jar (excluding the -sources jar).

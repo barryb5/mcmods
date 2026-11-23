@@ -9,6 +9,13 @@ repositories {
 	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
 	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
 	// for more information about repositories.
+
+	// Local Maven (~/.m2), only for our own shared library (../mcutils, published with its scripts/publish.sh)
+	mavenLocal {
+		content {
+			includeGroup "com.mcutils"
+		}
+	}
 }
 
 loom {
@@ -29,6 +36,10 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Shared library: compile against it, and bundle it inside our jar (jar-in-jar)
+	implementation "com.mcutils:mcutils:${project.mcutils_version}"
+	include "com.mcutils:mcutils:${project.mcutils_version}"
 }
 
 processResources {

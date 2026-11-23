@@ -1,5 +1,6 @@
 package com.tprand1min;
 
+import com.mcutils.Teleporter;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.network.chat.Component;

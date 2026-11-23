@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "tpmobtype1min",
+	"version": "${version}",
+	"name": "TP Mob Type 1 Min",
+	"description": "TODO: describe this mod.",
+	"authors": [
+		"barry"
+	],
+	"license": "All-Rights-Reserved",
+	"icon": "assets/tpmobtype1min/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.tpmobtype1min.TpMobType1Min"
+		],
+		"client": [
+			"com.tpmobtype1min.client.TpMobType1MinClient"
+		]
+	},
+	"mixins": [
+		"tpmobtype1min.mixins.json",
+		{
+			"config": "tpmobtype1min.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*",
+		"mcutils": "*"
+	}
+}

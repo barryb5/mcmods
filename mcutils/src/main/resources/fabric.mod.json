@@ -1,0 +1,18 @@
+{
+	"schemaVersion": 1,
+	"id": "mcutils",
+	"version": "${version}",
+	"name": "MC Utils",
+	"description": "Shared utility code for my mods.",
+	"authors": [
+		"barry"
+	],
+	"license": "All-Rights-Reserved",
+	"environment": "*",
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

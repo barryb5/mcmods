@@ -1,4 +1,4 @@
-package com.tprand1min;
+package com.mcutils;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
