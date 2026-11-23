@@ -6,7 +6,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.resources.Identifier;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.portal.TeleportTransition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +48,11 @@ public class TpRand1Min implements ModInitializer {
 			// Teleport Player if there are players, assume singleplayer
 			LOGGER.info("TP Rand 1 Min would teleport");
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-				Teleporter.TeleportRandom(server, player);
+				ServerLevel level = player.level();
+				TeleportTransition transition = Teleporter.TeleportRandomPlayer(server, player);
+				if (null != transition) {
+					Teleporter.TeleportAllEntities(level, transition.newLevel(), transition.position(), (Entity e) -> { return e instanceof LivingEntity && e.getType() != EntityTypes.PLAYER; });
+				}
 			}
 		}
 	}
