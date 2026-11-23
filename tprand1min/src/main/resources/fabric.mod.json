@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "tprand1min",
+	"version": "${version}",
+	"name": "TP Rand 1 Min",
+	"description": "Randomly teleports players every minute.",
+	"authors": [
+		"barry"
+	],
+	"license": "All-Rights-Reserved",
+	"icon": "assets/tprand1min/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.tprand1min.TpRand1Min"
+		],
+		"client": [
+			"com.tprand1min.client.TpRand1MinClient"
+		]
+	},
+	"mixins": [
+		"tprand1min.mixins.json",
+		{
+			"config": "tprand1min.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

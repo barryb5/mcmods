@@ -1,0 +1,9 @@
+# Repo-wide ignores. Each mod folder has its own .gitignore for build output.
+
+# macOS
+.DS_Store
+
+# IDE files if mcmods itself is opened as a project
+/.idea/
+/.vscode/
+*.iml
