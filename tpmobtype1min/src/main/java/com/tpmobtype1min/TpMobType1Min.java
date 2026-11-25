@@ -4,7 +4,10 @@ import com.mcutils.BossText;
 import com.mcutils.Teleporter;
 import net.fabricmc.api.ModInitializer;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.gamerule.v1.GameRuleBuilder;
+import net.fabricmc.fabric.api.gamerule.v1.GameRuleEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -23,6 +26,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.level.gamerules.GameRule;
+import net.minecraft.world.level.gamerules.GameRuleCategory;
 import net.minecraft.world.level.levelgen.Heightmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +36,17 @@ import java.util.*;
 
 public class TpMobType1Min implements ModInitializer {
 	public static final String MOD_ID = "tpmobtype1min";
-	public static int ticksUntilTeleport = 20 * 60;
+
+	public static final GameRule<Boolean> ALL_MOBS = GameRuleBuilder.forBoolean(false).category(GameRuleCategory.PLAYER).buildAndRegister(id("all_mobs"));
+	public static final GameRule<Integer> TELEPORT_INTERVAL = GameRuleBuilder.forInteger(60).range(1, 3600).category(GameRuleCategory.PLAYER).buildAndRegister(id("teleport_interval"));
+
+	// Ticks between teleports, kept in sync with the teleport_interval gamerule
+	private static int intervalTicks = 20 * 60;
+	// Server tick the current cycle (search, then countdown) started at, -1 before the first one
+	private static int cycleStartTick = -1;
+
+	// Only in the pool when all_mobs is on: teleporting the dragon out of the End breaks the fight
+	private static final List<EntityType<?>> BOSSES = List.of(EntityTypes.ENDER_DRAGON, EntityTypes.WITHER);
 
 	// Chunk radius loaded around the matching position in other dimensions while picking
 	private static final int LOAD_RADIUS = 4;
@@ -58,9 +73,6 @@ public class TpMobType1Min implements ModInitializer {
 	// A spot in another dimension where a mob type passed all natural spawn checks
 	private record SpawnSpot(ServerLevel level, BlockPos pos) {}
 
-	// Server tick the current pick started at, -1 when not picking
-	private static int pickStartTick = -1;
-
 	// Logger
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
@@ -79,52 +91,86 @@ public class TpMobType1Min implements ModInitializer {
 		mobs.add(EntityTypes.WANDERING_TRADER);
 		mobs.add(EntityTypes.SNOW_GOLEM);
 		mobs.add(EntityTypes.COPPER_GOLEM);
+		// Bosses are added back by onAllMobsChange when all_mobs is on
+		mobs.removeAll(BOSSES);
 
-		// Bosses: teleporting the dragon out of the End breaks the fight
-		mobs.remove(EntityTypes.ENDER_DRAGON);
-		mobs.remove(EntityTypes.WITHER);
+		ServerLifecycleEvents.SERVER_STARTED.register(TpMobType1Min::onServerStarted);
+		GameRuleEvents.changeCallback(ALL_MOBS).register(TpMobType1Min::onAllMobsChange);
+		GameRuleEvents.changeCallback(TELEPORT_INTERVAL).register(TpMobType1Min::onIntervalChange);
+	}
+
+	private static void onServerStarted(MinecraftServer server) {
+		// Change callbacks only fire on /gamerule, so apply the values the world was saved with
+		onAllMobsChange(server.getGameRules().get(ALL_MOBS), server);
+		onIntervalChange(server.getGameRules().get(TELEPORT_INTERVAL), server);
+
+		// Static state outlives a singleplayer world, start the next one fresh
+		cycleStartTick = -1;
+		current = null;
+		saved.clear();
+	}
+
+	private static void onAllMobsChange(Boolean allMobs, MinecraftServer server) {
+		// Remove first so setting the rule to the same value twice doesn't add duplicates
+		mobs.removeAll(BOSSES);
+		if (allMobs) {
+			mobs.addAll(BOSSES);
+		}
+	}
+
+	private static void onIntervalChange(Integer seconds, MinecraftServer server) {
+		// The countdown is measured from cycleStartTick, so a change applies to the current cycle right away
+		intervalTicks = seconds * 20;
 	}
 
 	private void onTick(MinecraftServer server) {
 		List<ServerPlayer> players = server.getPlayerList().getPlayers();
-		int tickInCycle = server.getTickCount() % ticksUntilTeleport;
+		if (players.isEmpty()) {
+			return;
+		}
+		// Everything is anchored to the first player (singleplayer assumption)
+		ServerPlayer player = players.getFirst();
+		int tick = server.getTickCount();
 
-		if (!players.isEmpty()) {
-			// Everything is anchored to the first player (singleplayer assumption)
-			ServerPlayer player = players.getFirst();
+		if (cycleStartTick < 0) {
+			startCycle(server, player);
+		}
+		int elapsed = tick - cycleStartTick;
 
-			// Teleport at the end of the cycle, then start picking the next mob
-			if (tickInCycle == 0 && current != null) {
-				teleportCurrent(server, player);
-				current = null;
-				saved.clear();
+		if (current == null) {
+			// Give the other dimensions' chunks time to load before picking
+			if (elapsed >= PREPARE_TICKS) {
+				pickAndFill(server, player);
 			}
+		} else if (elapsed >= intervalTicks) {
+			// >= rather than ==, so lowering the interval mid-cycle can't skip the teleport
+			teleportCurrent(server, player);
+			startCycle(server, player);
+			elapsed = 0;
+		}
 
-			if (current == null) {
-				if (pickStartTick < 0) {
-					pickStartTick = server.getTickCount();
-					loadOtherDimensions(server, player);
-				} else if (server.getTickCount() - pickStartTick >= PREPARE_TICKS) {
-					pickAndFill(server, player);
-					pickStartTick = -1;
-				}
-			}
-
-			if (server.getTickCount() % 20 == 0 && !saved.isEmpty()) {
-				trackSaved(server, tickInCycle >= ticksUntilTeleport - RELOAD_TICKS);
-			}
+		int ticksLeft = Math.max(intervalTicks - elapsed, 0);
+		if (tick % 20 == 0 && !saved.isEmpty()) {
+			trackSaved(server, ticksLeft <= RELOAD_TICKS);
 		}
 
 		// Boss bar countdown (updated every tick so the bar drains smoothly;
 		// ServerBossEvent only sends packets when the name/progress actually change)
-		int ticksLeft = ticksUntilTeleport - tickInCycle;
-		int secondsLeft = (ticksLeft + 19) / 20; // round up: 60..1
-		float progress = (float) ticksLeft / ticksUntilTeleport; // 1.0 -> 0.0
 		if (current != null) {
+			int secondsLeft = (ticksLeft + 19) / 20; // round up
+			float progress = (float) ticksLeft / intervalTicks; // 1.0 -> 0.0
 			BossText.onTick(server, progress, Component.literal(String.format("Teleporting %s to player in %ds", current.getDescription().getString(), secondsLeft)));
 		} else {
 			BossText.onTick(server, 1.f, Component.literal("Searching for mobs"));
 		}
+	}
+
+	// Start searching for the next mob type
+	private static void startCycle(MinecraftServer server, ServerPlayer player) {
+		cycleStartTick = server.getTickCount();
+		current = null;
+		saved.clear();
+		loadOtherDimensions(server, player);
 	}
 
 	private static void teleportCurrent(MinecraftServer server, ServerPlayer player) {
