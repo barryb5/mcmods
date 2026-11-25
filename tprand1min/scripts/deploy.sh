@@ -7,7 +7,16 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 INSTANCE_NAME="${1:-Mod Testing}"
-MODRINTH_DIR="$HOME/Library/Application Support/ModrinthApp"
+# Modrinth App data dir differs per OS (override by exporting MODRINTH_DIR).
+if [[ -z "${MODRINTH_DIR:-}" ]]; then
+	if [[ "$(uname -s)" == "Darwin" ]]; then
+		MODRINTH_DIR="$HOME/Library/Application Support/ModrinthApp"
+	else
+		MODRINTH_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/ModrinthApp"
+		# Flatpak install keeps its data elsewhere
+		[[ -d "$MODRINTH_DIR" ]] || MODRINTH_DIR="$HOME/.var/app/com.modrinth.ModrinthApp/data/ModrinthApp"
+	fi
+fi
 MOD_ID="tprand1min"
 
 # --- Build -----------------------------------------------------------------
