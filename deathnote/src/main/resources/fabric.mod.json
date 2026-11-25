@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "deathnote",
+	"version": "${version}",
+	"name": "Death Note",
+	"description": "Death Note mod.",
+	"authors": [
+		"barry"
+	],
+	"license": "All-Rights-Reserved",
+	"icon": "assets/deathnote/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.deathnote.DeathNote"
+		],
+		"client": [
+			"com.deathnote.client.DeathNoteClient"
+		]
+	},
+	"mixins": [
+		"deathnote.mixins.json",
+		{
+			"config": "deathnote.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*",
+		"mcutils": "*"
+	}
+}
