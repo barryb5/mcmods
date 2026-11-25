@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Relative;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -63,10 +64,23 @@ public class Teleporter {
         BlockState state2;
         ServerLevel level;
 
-        // Get random dimension and x and z coords
+        // Get random dimension and x and z coords (while avoiding xz coords of all void, usually in the end)
         level = getRandomDimension(server);
-        x = level.getRandom().nextInt(-300000000, 300000000);
-        z = level.getRandom().nextInt(-300000000, 300000000);
+        int attempts = 0;
+        do {
+            x = level.getRandom().nextInt(-30000000, 30000000);
+            z = level.getRandom().nextInt(-30000000, 30000000);
+            if (level.dimension() == Level.NETHER) {
+                x /= 8;
+                z /=8;
+            }
+            // Can't find even after 100 attempts
+            if (attempts >= 100) {
+                return null;
+            }
+            attempts++;
+        } while (level.getChunkAt(new BlockPos(x, 0, z)).getHeight(Heightmap.Types.WORLD_SURFACE, x & 15, z & 15) <= level.getMinY());
+
 
         // every possible y level
         int minY = level.getMinY() + 1;
