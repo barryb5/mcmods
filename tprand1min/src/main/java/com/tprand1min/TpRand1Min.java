@@ -22,17 +22,11 @@ public class TpRand1Min implements ModInitializer {
 	public static int ticksUntilTeleport = 20 * 60;
 	public static int startTick = 0;
 
-	// This logger is used to write text to the console and the log file.
-	// It is considered best practice to use your mod id as the logger's name.
-	// That way, it's clear which mod wrote info, warnings, and errors.
+	// Logger
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
 	@Override
 	public void onInitialize() {
-		// This code runs as soon as Minecraft is in a mod-load-ready state.
-		// However, some things (like resources) may still be uninitialized.
-		// Proceed with mild caution.
-
 		LOGGER.info("TP Rand 1 Min initialized");
 		ServerTickEvents.END_SERVER_TICK.register(this::onTick);
 	}
@@ -49,11 +43,7 @@ public class TpRand1Min implements ModInitializer {
 			// Teleport Player if there are players, assume singleplayer
 			LOGGER.info("TP Rand 1 Min would teleport");
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-				ServerLevel level = player.level();
 				TeleportTransition transition = Teleporter.TeleportRandomPlayer(server, player);
-				if (null != transition) {
-					Teleporter.TeleportAllEntities(level, transition.newLevel(), transition.position(), (Entity e) -> { return e instanceof LivingEntity && e.getType() != EntityTypes.PLAYER; });
-				}
 			}
 		}
 	}

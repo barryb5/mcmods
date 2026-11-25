@@ -1,5 +1,6 @@
 package com.mcutils;
 
+import net.minecraft.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.MinecraftServer;
@@ -10,6 +11,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
@@ -61,38 +63,41 @@ public class Teleporter {
         BlockState state2;
         ServerLevel level;
 
-        for (int i = 0; i < 5; ++i) {
-            level = getRandomDimension(server);
-            int count = 385;
-            x = player.getBlockX() + level.getRandom().nextInt(-1000000, 1000000);
-            z = player.getBlockZ() + level.getRandom().nextInt(-1000000, 1000000);
-            if (Math.abs(x) > 30000000) {
-                x = level.getRandom().nextInt(-10000000, 10000000);
-            }
-            if (Math.abs(z) > 30000000) {
-                z = level.getRandom().nextInt(-10000000, 10000000);
-            }
-            boolean works = true;
-            do {
-                y = level.getRandom().nextIntBetweenInclusive(level.getMinY() + 1, level.getMinY() + level.dimensionType().logicalHeight() - 1);
-                state = level.getBlockState(new BlockPos(x, y - 1, z));
-                state1 = level.getBlockState(new BlockPos(x, y, z));
-                state2 = level.getBlockState(new BlockPos(x, y + 1, z));
-                count--;
-                if (count == 0) {
-                    LOGGER.info("Failed to find teleport location 128 times");
-                    works = false;
-                    break;
-                }
-            } while (!((state.isFaceSturdy(level, new BlockPos(x, y - 1, z), Direction.UP) || state.getFluidState().is(FluidTags.WATER))
-                        && (state1.isAir() || state1.getFluidState().is(FluidTags.WATER))
-                        && (state2.isAir() || state2.getFluidState().is(FluidTags.WATER))));
+        // Get random dimension and x and z coords
+        level = getRandomDimension(server);
+        x = level.getRandom().nextInt(-300000000, 300000000);
+        z = level.getRandom().nextInt(-300000000, 300000000);
 
-            if (works) {
-                return TeleportPlayer(level, player, new Vec3(x + .5, y, z + .5));
+        // every possible y level
+        int minY = level.getMinY() + 1;
+        int maxY = level.getMinY() + level.dimensionType().logicalHeight() - 1;
+        List<Integer> candidateYs = new ArrayList<>();
+        for (int i = minY; i <= maxY; i++) {
+            candidateYs.add(i);
+        }
+        Util.shuffle(candidateYs, level.getRandom());
+
+        boolean found = false;
+        for (int candidateY : candidateYs) {
+            y = candidateY;
+            state = level.getBlockState(new BlockPos(x, y - 1, z));
+            state1 = level.getBlockState(new BlockPos(x, y, z));
+            state2 = level.getBlockState(new BlockPos(x, y + 1, z));
+            if ((state.isFaceSturdy(level, new BlockPos(x, y - 1, z), Direction.UP) || state.getFluidState().is(FluidTags.WATER))
+                    && (state1.isAir() || state1.getFluidState().is(FluidTags.WATER))
+                    && (state2.isAir() || state2.getFluidState().is(FluidTags.WATER))) {
+                found = true;
+                break;
             }
         }
-        return null;
+
+        if (!found) {
+            // fallback using world_surface
+            y = level.getChunkAt(new BlockPos(x, 0, z)).getHeight(Heightmap.Types.WORLD_SURFACE, x & 15, z & 15) + 1;
+            LOGGER.info("Failed to find teleport location after checking {} y levels, falling back to surface y:{}", candidateYs.size(), y);
+        }
+
+        return TeleportPlayer(level, player, new Vec3(x + .5, y, z + .5));
     }
 
     public static ServerLevel getRandomDimension(MinecraftServer server) {
